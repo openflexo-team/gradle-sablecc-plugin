@@ -32,7 +32,8 @@ artifactory {
     contextUrl = 'https://maven.openflexo.org/artifactory'
     publish {
         repository {
-            repoKey = 'openflexo-release' // The Artifactory repository key to publish to
+			def repo = (project.version.endsWith('-SNAPSHOT')) ? 'openflexo-snapshot' : 'openflexo-release'
+			repoKey = repo// The Artifactory repository key to publish to
             username = "$System.env.ARTIFACTORY_USER" // The publisher user name
             password = "$System.env.ARTIFACTORY_PASSWORD" // The publisher password
         }
