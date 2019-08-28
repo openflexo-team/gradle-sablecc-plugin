@@ -24,12 +24,12 @@ stdplugin {
 }
 
 group = "org.anarres.gradle"
-sourceCompatibility = '1.7'
-targetCompatibility = '1.7'
+//sourceCompatibility = '1.7'
+//targetCompatibility = '1.7'
 
 dependencies {
 	compile 'org.anarres.gradle:gradle-velocity-plugin:1.0.4'
-	compile 'sablecc:sablecc:3.2-1'
+	compile 'com.peterlavalle:sablecc-maven.sablecc:3.7'
 }
 
 animalsniffer {
