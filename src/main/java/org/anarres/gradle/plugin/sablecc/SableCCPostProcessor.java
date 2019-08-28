@@ -64,21 +64,21 @@ public class SableCCPostProcessor {
 
     public static void processFile(File file) throws IOException {
         if (LEXER_NAME.equals(file.getName())) {
-            processLexer(file);
+            //processLexer(file);
         } else if (PARSER_NAME.equals(file.getName())) {
-            processParser(file);
+            //processParser(file);
         } else if (DEPTH_FIRST_ADAPTER_NAME.equals(file.getName())) {
-            processClone(file);
+            //processClone(file);
         } else if (NODE_NAME.equals(file.getName())) {
-            processNode(file);
+            //processNode(file);
         } else if (TOKEN_NAME.equals(file.getName())) {
-            processToken(file);
+            //processToken(file);
         } else if (ANALYSIS_ADAPTER_NAME.equals(file.getName())) {
-            processAnalysisAdapter(file);
+            //processAnalysisAdapter(file);
         } else if (EOF_NAME.equals(file.getName())) {
-            processTToken(file, "EOF");
+            //processTToken(file, "EOF");
         } else if (file.getName().startsWith("T")) {
-            processTToken(file, "T");
+            //processTToken(file, "T");
         }
     }
 
@@ -354,9 +354,9 @@ public class SableCCPostProcessor {
             String line = lines.get(i);
             line = line.replace("private Hashtable", "private Map");
             line = line.replace("new Hashtable", "new WeakHashMap");
-            line = line.replace("public void case", "@Override\n    public void case");
-            line = line.replace("public Object get", "@Override\n    public Object get");
-            line = line.replace("public void set", "@Override\n    public void set");
+            // line = line.replace("public void case", "@Override\n    public void case");
+            // line = line.replace("public Object get", "@Override\n    public Object get");
+            // line = line.replace("public void set", "@Override\n    public void set");
             lines.set(i, line);
         }
         writeLines(file, lines);
