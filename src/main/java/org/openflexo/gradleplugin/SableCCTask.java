@@ -156,7 +156,6 @@ public class SableCCTask extends SourceTask {
 			}
 			grammarFiles.addAll(sourceFiles);
 		}
-		System.out.println("executing task with grammars: " + grammarFiles);
 
 		SableCCWorkerManager manager = new SableCCWorkerManager();
 		SableCCSpec spec = new SableCCSpecFactory().create(this, grammarFiles);
@@ -164,7 +163,7 @@ public class SableCCTask extends SourceTask {
 		evaluate(result);
 	}
 
-	private void evaluate(SableCCResult result) {
+	private static void evaluate(SableCCResult result) {
 		int errorCount = result.getErrorCount();
 		if (errorCount < 0) {
 			throw new SableCCSourceGenerationException("There were errors during grammar generation", result.getException());

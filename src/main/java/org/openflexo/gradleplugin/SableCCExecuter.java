@@ -74,27 +74,14 @@ public class SableCCExecuter implements SableCCWorker {
 
 		public final SableCCResult process(SableCCSpec spec) {
 			try {
-				return doProcess(spec);
+				for (File grammarFile : spec.getGrammarFiles()) {
+					invoke(spec.getArguments(), grammarFile, spec.getOutputDirectory());
+				}
+				return new SableCCResult(0);
 			} catch (ClassNotFoundException e) {
 				// this shouldn't happen if you call check availability with #available first
 				throw new GradleException("Cannot process antlr sources", e);
 			}
 		}
-
-		/**
-		 * process used for antlr3/4
-		 */
-		public SableCCResult doProcess(SableCCSpec spec) throws ClassNotFoundException {
-			for (File grammarFile : spec.getGrammarFiles()) {
-				invoke(spec.getArguments(), grammarFile, spec.getOutputDirectory());
-			}
-			return new SableCCResult(0);
-		}
-
-		protected static String[] toArray(List<String> strings) {
-			return strings.toArray(new String[0]);
-		}
-
 	}
-
 }
