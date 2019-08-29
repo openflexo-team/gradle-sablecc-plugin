@@ -24,20 +24,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
-import javax.inject.Inject;
-
 import org.gradle.api.NonNullApi;
-import org.gradle.api.file.FileCollection;
 import org.gradle.api.file.FileTree;
 import org.gradle.api.file.SourceDirectorySet;
 import org.gradle.api.tasks.CacheableTask;
-import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.OutputDirectory;
 import org.gradle.api.tasks.PathSensitive;
 import org.gradle.api.tasks.PathSensitivity;
@@ -45,7 +38,9 @@ import org.gradle.api.tasks.SourceTask;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.api.tasks.incremental.IncrementalTaskInputs;
 import org.gradle.internal.MutableBoolean;
-import org.gradle.process.internal.worker.WorkerProcessFactory;
+import org.gradle.internal.reflect.JavaMethod;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Generates parsers from SableCC grammars.
@@ -54,40 +49,9 @@ import org.gradle.process.internal.worker.WorkerProcessFactory;
 @CacheableTask
 public class SableCCTask extends SourceTask {
 
-	private List<String> arguments = new ArrayList<>();
-
-	private FileCollection sableccClasspath;
+	private static final Logger LOGGER = LoggerFactory.getLogger(SableCCTask.class);
 
 	private File outputDirectory;
-	private String maxHeapSize;
-
-	/**
-	 * The maximum heap size for the forked sablecc process (ex: '1g').
-	 */
-	@Internal
-	public String getMaxHeapSize() {
-		return maxHeapSize;
-	}
-
-	public void setMaxHeapSize(String maxHeapSize) {
-		this.maxHeapSize = maxHeapSize;
-	}
-
-	public void setArguments(List<String> arguments) {
-		if (arguments != null) {
-			this.arguments = arguments;
-		}
-	}
-
-	/**
-	 * List of command-line arguments passed to the sablecc process
-	 *
-	 * @return The sablecc command-line arguments
-	 */
-	@Input
-	public List<String> getArguments() {
-		return arguments;
-	}
 
 	/**
 	 * Returns the directory to generate the parser source files into.
@@ -107,11 +71,6 @@ public class SableCCTask extends SourceTask {
 	 */
 	public void setOutputDirectory(File outputDirectory) {
 		this.outputDirectory = outputDirectory;
-	}
-
-	@Inject
-	protected WorkerProcessFactory getWorkerProcessBuilderFactory() {
-		throw new UnsupportedOperationException();
 	}
 
 	@TaskAction
@@ -157,11 +116,22 @@ public class SableCCTask extends SourceTask {
 			grammarFiles.addAll(sourceFiles);
 		}
 
-		SableCCWorkerManager manager = new SableCCWorkerManager();
-		SableCCSpec spec = new SableCCSpecFactory().create(this, grammarFiles);
-		SableCCResult result = manager.runWorker(getProject().getProjectDir(), getWorkerProcessBuilderFactory(), spec);
-		evaluate(result);
+		SableCCSpec spec = new SableCCSpec(grammarFiles, getOutputDirectory());
+		try {
+			final Class<?> sableccClass = Class.forName(SABLECC_MAIN_CLASS);
+			JavaMethod<?, Void> method = JavaMethod.ofStatic(sableccClass, Void.class, "processGrammar", File.class, File.class);
+			LOGGER.info("Processing with SableCC");
+			for (File grammarFile : spec.getGrammarFiles()) {
+				method.invokeStatic(grammarFile, spec.getOutputDirectory());
+			}
+			SableCCResult result = new SableCCResult(0);
+			evaluate(result);
+		} catch (ClassNotFoundException cnf) {
+			throw new IllegalStateException("No SableCC implementation available");
+		}
 	}
+
+	private static String SABLECC_MAIN_CLASS = "org.sablecc.sablecc.SableCC";
 
 	private static void evaluate(SableCCResult result) {
 		int errorCount = result.getErrorCount();

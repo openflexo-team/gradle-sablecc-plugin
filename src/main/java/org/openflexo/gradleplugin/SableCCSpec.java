@@ -18,33 +18,20 @@ package org.openflexo.gradleplugin;
 
 import java.io.File;
 import java.io.Serializable;
-import java.util.List;
 import java.util.Set;
 
 public class SableCCSpec implements Serializable {
 
-	private List<String> arguments;
 	private Set<File> grammarFiles;
-	private String maxHeapSize;
 	private File outputDirectory;
 
-	public SableCCSpec(List<String> arguments, Set<File> grammarFiles, File outputDirectory, String maxHeapSize) {
-		this.arguments = arguments;
+	public SableCCSpec(Set<File> grammarFiles, File outputDirectory) {
 		this.grammarFiles = grammarFiles;
 		this.outputDirectory = outputDirectory;
-		this.maxHeapSize = maxHeapSize;
-	}
-
-	public List<String> getArguments() {
-		return arguments;
 	}
 
 	public Set<File> getGrammarFiles() {
 		return grammarFiles;
-	}
-
-	public String getMaxHeapSize() {
-		return maxHeapSize;
 	}
 
 	public File getOutputDirectory() {
