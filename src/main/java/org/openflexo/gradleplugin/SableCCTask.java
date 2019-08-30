@@ -18,6 +18,8 @@ package org.openflexo.gradleplugin;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -26,6 +28,8 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.gradle.api.NonNullApi;
 import org.gradle.api.file.FileTree;
@@ -38,7 +42,10 @@ import org.gradle.api.tasks.SourceTask;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.api.tasks.incremental.IncrementalTaskInputs;
 import org.gradle.internal.MutableBoolean;
+import org.gradle.internal.UncheckedException;
 import org.gradle.internal.reflect.JavaMethod;
+import org.sablecc.sablecc.lexer.LexerException;
+import org.sablecc.sablecc.parser.ParserException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,36 +123,68 @@ public class SableCCTask extends SourceTask {
 			grammarFiles.addAll(sourceFiles);
 		}
 
-		SableCCSpec spec = new SableCCSpec(grammarFiles, getOutputDirectory());
+		// SableCCSpec spec = new SableCCSpec(grammarFiles, getOutputDirectory());
 		try {
 			final Class<?> sableccClass = Class.forName(SABLECC_MAIN_CLASS);
 			JavaMethod<?, Void> method = JavaMethod.ofStatic(sableccClass, Void.class, "processGrammar", File.class, File.class);
 			LOGGER.info("Processing with SableCC");
-			for (File grammarFile : spec.getGrammarFiles()) {
-				method.invokeStatic(grammarFile, spec.getOutputDirectory());
+			SableCCResult result = new SableCCResult();
+			for (File grammarFile : grammarFiles) {
+				PrintStream originalStream = System.out;
+				try (PrintStream dummyStream = new PrintStream(new OutputStream() {
+					@Override
+					public void write(int b) {
+					}
+				})) {
+					System.setOut(dummyStream);
+					try {
+						method.invokeStatic(grammarFile, getOutputDirectory());
+					} catch (UncheckedException e) {
+						Throwable cause = e.getCause();
+						if (cause instanceof ParserException) {
+							ParserException ex = (ParserException) cause;
+							result.addException(getException("Parse", ex.getMessage(), " found " + ex.getToken().toString()));
+						}
+						else if (cause instanceof LexerException) {
+							LexerException ex = (LexerException) cause;
+							result.addException(getException("Lexing", ex.getMessage(), ""));
+						}
+						else
+							result.addException(cause);
+					} finally {
+						System.setOut(originalStream);
+					}
+				}
 			}
-			SableCCResult result = new SableCCResult(0);
-			evaluate(result);
+			int errorCount = result.getErrorCount();
+			if (errorCount == 0) {
+				System.out.println("Generated code for " + grammarFiles.toString() + " in " + getOutputDirectory());
+			}
+			else if (errorCount < 0) {
+				throw new SableCCSourceGenerationException("There were errors during grammar generation", result.getFirstException());
+			}
+			else if (errorCount == 1) {
+				throw new SableCCSourceGenerationException("There was 1 error during grammar generation", result.getFirstException());
+			}
+			else if (errorCount > 1) {
+				throw new SableCCSourceGenerationException("There were " + errorCount + " errors during grammar generation",
+						result.getFirstException());
+			}
 		} catch (ClassNotFoundException cnf) {
 			throw new IllegalStateException("No SableCC implementation available");
 		}
 	}
 
-	private static String SABLECC_MAIN_CLASS = "org.sablecc.sablecc.SableCC";
+	private static Exception getException(String kind, String message, String posttext) {
+		Pattern p = Pattern.compile("\\[([0-9]*),([0-9]*)\\] (.*)");
+		Matcher matcher = p.matcher(message);
+		matcher.find();
+		return new Exception(kind + " error in the grammar at line " + matcher.group(1) + " character " + matcher.group(2) + ", "
+				+ matcher.group(3) + posttext);
 
-	private static void evaluate(SableCCResult result) {
-		int errorCount = result.getErrorCount();
-		if (errorCount < 0) {
-			throw new SableCCSourceGenerationException("There were errors during grammar generation", result.getException());
-		}
-		else if (errorCount == 1) {
-			throw new SableCCSourceGenerationException("There was 1 error during grammar generation", result.getException());
-		}
-		else if (errorCount > 1) {
-			throw new SableCCSourceGenerationException("There were " + errorCount + " errors during grammar generation",
-					result.getException());
-		}
 	}
+
+	private static String SABLECC_MAIN_CLASS = "org.sablecc.sablecc.SableCC";
 
 	/**
 	 * Sets the source for this task. Delegates to {@link #setSource(Object)}.

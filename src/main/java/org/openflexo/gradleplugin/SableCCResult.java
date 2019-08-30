@@ -17,26 +17,28 @@
 package org.openflexo.gradleplugin;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 public class SableCCResult implements Serializable {
 
-	private final int errorCount;
-	private final Exception exception;
+	private int errorCount = 0;
+	private List<Throwable> exceptions = new ArrayList<>();
 
-	public SableCCResult(int errorCount) {
-		this(errorCount, null);
-	}
-
-	public SableCCResult(int errorCount, Exception exception) {
-		this.errorCount = errorCount;
-		this.exception = exception;
+	public void addException(Throwable e) {
+		this.exceptions.add(e);
+		this.errorCount++;
 	}
 
 	public int getErrorCount() {
 		return errorCount;
 	}
 
-	public Exception getException() {
-		return exception;
+	public List<Throwable> getExceptions() {
+		return exceptions;
+	}
+
+	public Throwable getFirstException() {
+		return exceptions.get(0);
 	}
 }
