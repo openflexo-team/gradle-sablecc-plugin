@@ -1,22 +1,20 @@
 buildscript {
-  repositories {
-    jcenter()
-  }
-  dependencies {
-    classpath "org.jfrog.buildinfo:build-info-extractor-gradle:latest.release"
-  }
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        // For the artifactory plugin
+        classpath "org.jfrog.buildinfo:build-info-extractor-gradle:latest.release"
+    }
 }
 
 group 'org.openflexo'
 
-apply plugin: 'groovy'
+apply plugin: 'java'
 apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.artifactory'
 
 repositories {
-    maven {
-        url "https://plugins.gradle.org/m2/"
-    }
     jcenter()
 }
 
@@ -56,5 +54,5 @@ artifactory {
 
 dependencies {
     compile gradleApi()
-	compile 'com.peterlavalle:sablecc-maven.sablecc:3.7'
+    compile 'com.peterlavalle:sablecc-maven.sablecc:3.7'
 }
