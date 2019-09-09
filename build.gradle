@@ -55,4 +55,5 @@ artifactory {
 dependencies {
     compile gradleApi()
     compile 'com.peterlavalle:sablecc-maven.sablecc:3.7'
+    compile group: 'com.google.guava', name: 'guava', version: '27.0-jre'
 }

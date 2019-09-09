@@ -24,12 +24,14 @@ import java.io.UncheckedIOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import com.google.common.base.CaseFormat;
 
 import org.gradle.api.NonNullApi;
 import org.gradle.api.file.FileTree;
@@ -131,11 +133,15 @@ public class SableCCTask extends SourceTask {
 			SableCCResult result = new SableCCResult();
 			for (File grammarFile : grammarFiles) {
 				PrintStream originalStream = System.out;
-				try (PrintStream dummyStream = new PrintStream(new OutputStream() {
+                                Path file = Paths.get("sablecc-output.txt");
+				try (PrintStream dummyStream = new PrintStream(Files.newOutputStream(file))) {
+/*
+new OutputStream() {
 					@Override
 					public void write(int b) {
 					}
-				})) {
+				}
+*/
 					System.setOut(dummyStream);
 					try {
 						method.invokeStatic(grammarFile, getOutputDirectory());
@@ -151,6 +157,21 @@ public class SableCCTask extends SourceTask {
 						}
 						else
 							result.addException(cause);
+                                        } catch (RuntimeException e) {
+                                            String message = e.getMessage();
+                                            if (message.contains("shift/reduce conflict")) {
+                                                result.addException(new Exception("Your grammar has conflicts: " + message));
+                                            } else {
+                                                Pattern p = Pattern.compile("\\[([0-9]*),([0-9]*)\\] P(\\w*) and T(\\w*) undefined.");
+                                                Matcher matcher = p.matcher(message);
+                                                try {
+                                                    matcher.find();
+                                                    result.addException(new Exception("Error in the grammar at line " + matcher.group(1) + " character " + matcher.group(2) + ", the symbol "
+                                                                                      + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, matcher.group(3)) + " is undefined"));
+                                                } catch (Exception ee) {
+                                                    throw e;
+                                                }
+                                            }
 					} finally {
 						System.setOut(originalStream);
 					}
@@ -172,7 +193,7 @@ public class SableCCTask extends SourceTask {
 			}
 		} catch (ClassNotFoundException cnf) {
 			throw new IllegalStateException("No SableCC implementation available");
-		}
+		} catch (IOException e) {}
 	}
 
 	private static Exception getException(String kind, String message, String posttext) {
