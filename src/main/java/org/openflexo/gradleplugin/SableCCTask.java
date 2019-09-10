@@ -133,15 +133,10 @@ public class SableCCTask extends SourceTask {
 			SableCCResult result = new SableCCResult();
 			for (File grammarFile : grammarFiles) {
 				PrintStream originalStream = System.out;
-                                Path file = Paths.get("sablecc-output.txt");
-				try (PrintStream dummyStream = new PrintStream(Files.newOutputStream(file))) {
-/*
-new OutputStream() {
+				try (PrintStream dummyStream = new PrintStream(new OutputStream() {
 					@Override
-					public void write(int b) {
-					}
-				}
-*/
+					public void write(int b) { }
+				})) {
 					System.setOut(dummyStream);
 					try {
 						method.invokeStatic(grammarFile, getOutputDirectory());
@@ -193,7 +188,7 @@ new OutputStream() {
 			}
 		} catch (ClassNotFoundException cnf) {
 			throw new IllegalStateException("No SableCC implementation available");
-		} catch (IOException e) {}
+		}
 	}
 
 	private static Exception getException(String kind, String message, String posttext) {
