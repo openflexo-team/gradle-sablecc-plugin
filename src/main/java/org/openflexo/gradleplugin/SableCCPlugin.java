@@ -28,12 +28,15 @@ import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.DependencySet;
+import org.gradle.api.file.FileTreeElement;
 import org.gradle.api.internal.plugins.DslObject;
 import org.gradle.api.internal.tasks.DefaultSourceSet;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginConvention;
 import org.gradle.api.tasks.SourceSet;
+
+import groovy.lang.Closure;
 
 /**
  * A plugin for adding SableCC support to {@link JavaPlugin java projects}.
@@ -83,7 +86,14 @@ public class SableCCPlugin implements Plugin<Project> {
 				final File outputDirectory = new File(outputDirectoryName);
 				sourceSet.getJava().srcDir(outputDirectory);
 				sourceSet.getResources().srcDir(outputDirectory);
-				sourceSet.getResources().include("**/*.dat");
+				System.out.println(sourceSet.getResources().getSrcDirs());
+				Closure<Boolean> closure = new Closure<Boolean>(null) {
+					public Boolean call(Object arg) {
+						FileTreeElement e = (FileTreeElement) arg;
+						return e.getPath().contains("generated-sources") && !e.getPath().endsWith(".dat");
+					}
+				};
+				sourceSet.getResources().exclude(closure);
 
 				project.getTasks().register(taskName, SableCCTask.class, new Action<SableCCTask>() {
 					@Override
