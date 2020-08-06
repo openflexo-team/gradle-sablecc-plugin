@@ -10,7 +10,7 @@ buildscript {
 
 group 'org.openflexo'
 
-apply plugin: 'java'
+apply plugin: 'java-library'
 apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.artifactory'
 
@@ -53,7 +53,7 @@ artifactory {
 }
 
 dependencies {
-    compile gradleApi()
-    compile 'com.peterlavalle:sablecc-maven.sablecc:3.7'
-    compile group: 'com.google.guava', name: 'guava', version: '27.0-jre'
+    implementation gradleApi()
+    implementation 'com.peterlavalle:sablecc-maven.sablecc:3.7'
+    implementation group: 'com.google.guava', name: 'guava', version: '27.0-jre'
 }
