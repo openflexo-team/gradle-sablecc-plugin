@@ -86,7 +86,6 @@ public class SableCCPlugin implements Plugin<Project> {
 				final File outputDirectory = new File(outputDirectoryName);
 				sourceSet.getJava().srcDir(outputDirectory);
 				sourceSet.getResources().srcDir(outputDirectory);
-				System.out.println(sourceSet.getResources().getSrcDirs());
 				Closure<Boolean> closure = new Closure<Boolean>(null) {
 					public Boolean call(Object arg) {
 						FileTreeElement e = (FileTreeElement) arg;
