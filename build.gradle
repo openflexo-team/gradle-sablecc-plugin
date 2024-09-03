@@ -47,9 +47,9 @@ artifactory {
             publishPom = true
         }
     }
-    resolve {
-        repoKey = 'maven'
-    }
+    //resolve {
+    //    repoKey = 'maven'
+    //}
 }
 
 dependencies {
