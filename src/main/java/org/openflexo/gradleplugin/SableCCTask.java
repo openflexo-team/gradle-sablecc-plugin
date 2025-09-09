@@ -40,7 +40,6 @@ import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.OutputDirectory;
 import org.gradle.api.tasks.PathSensitive;
 import org.gradle.api.tasks.PathSensitivity;
-import org.gradle.api.tasks.SkipWhenEmpty;
 import org.gradle.api.tasks.SourceTask;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.internal.UncheckedException;
@@ -253,7 +252,6 @@ public class SableCCTask extends SourceTask {
 	@Override
 	@Incremental
 	@InputFiles
-	@SkipWhenEmpty
 	@PathSensitive(PathSensitivity.RELATIVE)
 	public FileTree getSource() {
 		return super.getSource();
