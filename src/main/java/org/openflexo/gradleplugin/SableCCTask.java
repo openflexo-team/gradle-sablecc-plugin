@@ -33,8 +33,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.gradle.api.NonNullApi;
+import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.FileTree;
-import org.gradle.api.file.SourceDirectorySet;
 import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.OutputDirectory;
@@ -58,7 +58,7 @@ import com.google.common.base.CaseFormat;
  */
 @NonNullApi
 @CacheableTask
-public class SableCCTask extends SourceTask {
+public abstract class SableCCTask extends SourceTask {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(SableCCTask.class);
 
@@ -90,7 +90,7 @@ public class SableCCTask extends SourceTask {
 		final Set<File> sourceFiles = getSource().getFiles();
 		final AtomicBoolean cleanRebuild = new AtomicBoolean();
 
-		inputs.getFileChanges(getSource()).forEach(change -> {
+		inputs.getFileChanges(getGrammarFiles()).forEach(change -> {
 			File input = change.getFile();
 			switch (change.getChangeType()) {
 				case ADDED:
@@ -224,10 +224,10 @@ public class SableCCTask extends SourceTask {
 	 *            The source.
 	 * @since 4.0
 	 */
-	@Override
+	/*@Override
 	public void setSource(FileTree source) {
 		setSource((Object) source);
-	}
+	}*/
 
 	/**
 	 * Sets the source for this task. Delegates to {@link SourceTask#setSource(Object)}.
@@ -239,21 +239,39 @@ public class SableCCTask extends SourceTask {
 	 * @param source
 	 *            The source.
 	 */
-	@Override
+	/*@Override
 	public void setSource(Object source) {
 		super.setSource(source);
-	}
+	}*/
 
 	/**
 	 * Returns the source for this task, after the include and exclude patterns have been applied. Ignores source files which do not exist.
 	 *
 	 * @return The source.
 	 */
-	@Override
+	/*@Override
 	@Incremental
 	@InputFiles
 	@PathSensitive(PathSensitivity.RELATIVE)
 	public FileTree getSource() {
 		return super.getSource();
+	}*/
+
+	@InputFiles
+	@Incremental
+	@PathSensitive(PathSensitivity.RELATIVE)
+	public abstract ConfigurableFileCollection getGrammarFiles();
+
+	@Override
+	public void setSource(Object source) {
+		super.setSource(source);
+		// on alimente aussi la propriété incrémentale
+		getGrammarFiles().setFrom(source);
 	}
+
+	@Override
+	public FileTree getSource() {
+		return super.getSource();
+	}
+
 }
