@@ -18,7 +18,7 @@ into build/generated-sources/sablecc:
          maven { url uri('https://maven.openflexo.org/artifactory/openflexo-deps/') }
        }
        dependencies {
-         classpath 'org.openflexo:gradle-sablecc-plugin:[1.2.0,)'
+         classpath 'org.openflexo:gradle-sablecc-plugin:[1.3.0,)'
        }
      }
 

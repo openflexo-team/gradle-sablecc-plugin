@@ -24,14 +24,13 @@ import java.io.UncheckedIOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import com.google.common.base.CaseFormat;
 
 import org.gradle.api.NonNullApi;
 import org.gradle.api.file.FileTree;
@@ -42,14 +41,15 @@ import org.gradle.api.tasks.PathSensitive;
 import org.gradle.api.tasks.PathSensitivity;
 import org.gradle.api.tasks.SourceTask;
 import org.gradle.api.tasks.TaskAction;
-import org.gradle.api.tasks.incremental.IncrementalTaskInputs;
-import org.gradle.internal.MutableBoolean;
 import org.gradle.internal.UncheckedException;
 import org.gradle.internal.reflect.JavaMethod;
+import org.gradle.work.InputChanges;
 import org.sablecc.sablecc.lexer.LexerException;
 import org.sablecc.sablecc.parser.ParserException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.CaseFormat;
 
 /**
  * Generates parsers from SableCC grammars.
@@ -83,25 +83,29 @@ public class SableCCTask extends SourceTask {
 	}
 
 	@TaskAction
-	public void execute(IncrementalTaskInputs inputs) {
+	public void execute(InputChanges inputs) {
 		final Set<File> grammarFiles = new HashSet<>();
 		final Set<File> sourceFiles = getSource().getFiles();
-		final MutableBoolean cleanRebuild = new MutableBoolean();
-		inputs.outOfDate(details -> {
-			File input = details.getFile();
-			if (sourceFiles.contains(input)) {
-				grammarFiles.add(input);
-			}
-			else {
-				// classpath change?
-				cleanRebuild.set(true);
+		final AtomicBoolean cleanRebuild = new AtomicBoolean();
+
+		inputs.getFileChanges(getSource()).forEach(change -> {
+			File input = change.getFile();
+			switch (change.getChangeType()) {
+				case ADDED:
+				case MODIFIED:
+					if (sourceFiles.contains(input)) {
+						grammarFiles.add(input);
+					}
+					else {
+						cleanRebuild.set(true);
+					}
+					break;
+				case REMOVED:
+					cleanRebuild.set(true);
+					break;
 			}
 		});
-		inputs.removed(details -> {
-			if (details.isRemoved()) {
-				cleanRebuild.set(true);
-			}
-		});
+
 		if (cleanRebuild.get()) {
 			try {
 				Path directory = outputDirectory.toPath();
@@ -114,8 +118,9 @@ public class SableCCTask extends SourceTask {
 
 					@Override
 					public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-						if (dir != directory)
+						if (dir != directory) {
 							Files.delete(dir);
+						}
 						return FileVisitResult.CONTINUE;
 					}
 				});
@@ -135,7 +140,8 @@ public class SableCCTask extends SourceTask {
 				PrintStream originalStream = System.out;
 				try (PrintStream dummyStream = new PrintStream(new OutputStream() {
 					@Override
-					public void write(int b) { }
+					public void write(int b) {
+					}
 				})) {
 					System.setOut(dummyStream);
 					try {
@@ -150,23 +156,26 @@ public class SableCCTask extends SourceTask {
 							LexerException ex = (LexerException) cause;
 							result.addException(getException("Lexing", ex.getMessage(), ""));
 						}
-						else
+						else {
 							result.addException(cause);
-                                        } catch (RuntimeException e) {
-                                            String message = e.getMessage();
-                                            if (message.contains("shift/reduce conflict")) {
-                                                result.addException(new Exception("Your grammar has conflicts: " + message));
-                                            } else {
-                                                Pattern p = Pattern.compile("\\[([0-9]*),([0-9]*)\\] P(\\w*) and T(\\w*) undefined.");
-                                                Matcher matcher = p.matcher(message);
-                                                try {
-                                                    matcher.find();
-                                                    result.addException(new Exception("Error in the grammar at line " + matcher.group(1) + " character " + matcher.group(2) + ", the symbol "
-                                                                                      + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, matcher.group(3)) + " is undefined"));
-                                                } catch (Exception ee) {
-                                                    throw e;
-                                                }
-                                            }
+						}
+					} catch (RuntimeException e) {
+						String message = e.getMessage();
+						if (message.contains("shift/reduce conflict")) {
+							result.addException(new Exception("Your grammar has conflicts: " + message));
+						}
+						else {
+							Pattern p = Pattern.compile("\\[([0-9]*),([0-9]*)\\] P(\\w*) and T(\\w*) undefined.");
+							Matcher matcher = p.matcher(message);
+							try {
+								matcher.find();
+								result.addException(new Exception("Error in the grammar at line " + matcher.group(1) + " character "
+										+ matcher.group(2) + ", the symbol "
+										+ CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, matcher.group(3)) + " is undefined"));
+							} catch (Exception ee) {
+								throw e;
+							}
+						}
 					} finally {
 						System.setOut(originalStream);
 					}
