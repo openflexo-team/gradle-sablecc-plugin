@@ -1,6 +1,6 @@
 buildscript {
     repositories {
-        jcenter()
+        mavenCentral()
     }
     dependencies {
         // For the artifactory plugin
@@ -8,14 +8,14 @@ buildscript {
     }
 }
 
-group 'org.openflexo'
+group = 'org.openflexo'
 
 apply plugin: 'java-library'
 apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.artifactory'
 
 repositories {
-    jcenter()
+    mavenCentral()
 }
 
 publishing {
