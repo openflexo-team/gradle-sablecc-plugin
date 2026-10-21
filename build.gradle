@@ -4,11 +4,16 @@ buildscript {
     }
     dependencies {
         // For the artifactory plugin
-        classpath "org.jfrog.buildinfo:build-info-extractor-gradle:latest.release"
+        classpath "org.jfrog.buildinfo:build-info-extractor-gradle:5.2.0"
     }
 }
 
 group = 'org.openflexo'
+
+// The plugin needs Java 17 to be built and to run, like the Gradle 9 it is meant for
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+}
 
 apply plugin: 'java-library'
 apply plugin: 'maven-publish'
