@@ -29,14 +29,12 @@ import org.gradle.api.Task;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.DependencySet;
 import org.gradle.api.file.FileTreeElement;
-import org.gradle.api.internal.plugins.DslObject;
-import org.gradle.api.internal.tasks.DefaultSourceSet;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.JavaPlugin;
-import org.gradle.api.plugins.JavaPluginConvention;
+import org.gradle.api.plugins.JavaPluginExtension;
+import org.gradle.api.specs.Spec;
 import org.gradle.api.tasks.SourceSet;
 
-import groovy.lang.Closure;
 
 /**
  * A plugin for adding SableCC support to {@link JavaPlugin java projects}.
@@ -65,14 +63,14 @@ public class SableCCPlugin implements Plugin<Project> {
 
 		project.getConfigurations().getByName(IMPLEMENTATION_CONFIGURATION_NAME).extendsFrom(sableccConfiguration);
 
-		project.getConvention().getPlugin(JavaPluginConvention.class).getSourceSets().all(new Action<SourceSet>() {
+		project.getExtensions().getByType(JavaPluginExtension.class).getSourceSets().all(new Action<SourceSet>() {
 			@Override
 			public void execute(final SourceSet sourceSet) {
 				// for each source set we will:
 				// 1) Add a new 'sablecc' virtual directory mapping
 				final SableCCSourceVirtualDirectoryImpl sableccDirectoryDelegate = new SableCCSourceVirtualDirectoryImpl(
-						((DefaultSourceSet) sourceSet).getDisplayName(), objectFactory);
-				new DslObject(sourceSet).getConvention().getPlugins().put(SableCCSourceVirtualDirectory.NAME, sableccDirectoryDelegate);
+						sourceSet.getName(), objectFactory);
+				sourceSet.getExtensions().add(SableCCSourceVirtualDirectory.NAME, sableccDirectoryDelegate);
 				final String srcDir = "src/" + sourceSet.getName() + "/sablecc";
 				sableccDirectoryDelegate.getSableCC().srcDir(srcDir);
 				sourceSet.getAllSource().source(sableccDirectoryDelegate.getSableCC());
@@ -82,17 +80,16 @@ public class SableCCPlugin implements Plugin<Project> {
 				final String taskName = sourceSet.getTaskName("generate", "GrammarSource");
 
 				// 3) Set up the SableCC output directory (adding to javac inputs!)
-				final String outputDirectoryName = project.getBuildDir() + "/generated-sources/sablecc/" + sourceSet.getName();
+				final String outputDirectoryName = project.getLayout().getBuildDirectory().get().getAsFile() + "/generated-sources/sablecc/" + sourceSet.getName();
 				final File outputDirectory = new File(outputDirectoryName);
 				sourceSet.getJava().srcDir(outputDirectory);
 				sourceSet.getResources().srcDir(outputDirectory);
-				Closure<Boolean> closure = new Closure<Boolean>(null) {
-					public Boolean call(Object arg) {
-						FileTreeElement e = (FileTreeElement) arg;
+				sourceSet.getResources().exclude(new Spec<FileTreeElement>() {
+					@Override
+					public boolean isSatisfiedBy(FileTreeElement e) {
 						return e.getPath().contains("generated-sources") && !e.getPath().endsWith(".dat");
 					}
-				};
-				sourceSet.getResources().exclude(closure);
+				});
 
 				project.getTasks().register(taskName, SableCCTask.class, new Action<SableCCTask>() {
 					@Override
@@ -101,6 +98,15 @@ public class SableCCPlugin implements Plugin<Project> {
 						// 4) set up convention mapping for default sources (allows user to not have to specify)
 						sableccTask.setSource(sableccDirectoryDelegate.getSableCC());
 						sableccTask.setOutputDirectory(outputDirectory);
+					}
+				});
+
+				// The generated directory is also a resources directory (the grammars are shipped with the parser): processing the
+				// resources reads the output of the task, Gradle 9 requires the dependency to be declared
+				project.getTasks().named(sourceSet.getProcessResourcesTaskName(), new Action<Task>() {
+					@Override
+					public void execute(Task task) {
+						task.dependsOn(taskName);
 					}
 				});
 

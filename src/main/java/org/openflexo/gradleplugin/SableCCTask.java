@@ -21,6 +21,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.lang.reflect.InvocationTargetException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -43,11 +46,8 @@ import org.gradle.api.tasks.PathSensitivity;
 import org.gradle.api.tasks.SourceTask;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.internal.UncheckedException;
-import org.gradle.internal.reflect.JavaMethod;
 import org.gradle.work.Incremental;
 import org.gradle.work.InputChanges;
-import org.sablecc.sablecc.lexer.LexerException;
-import org.sablecc.sablecc.parser.ParserException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -132,10 +132,12 @@ public abstract class SableCCTask extends SourceTask {
 			grammarFiles.addAll(sourceFiles);
 		}
 
-		// SableCCSpec spec = new SableCCSpec(grammarFiles, getOutputDirectory());
+		// SableCC keeps static state: running it twice in the same JVM (a Gradle daemon builds many grammars, and the same ones again)
+		// fails with errors such as "The symbol EOF aready exists" or "N >= 0" (SABLECC-D-1). Each grammar is processed by SableCC loaded
+		// in a class loader of its own, so that no state is shared.
 		try {
 			final Class<?> sableccClass = Class.forName(SABLECC_MAIN_CLASS);
-			JavaMethod<?, Void> method = JavaMethod.ofStatic(sableccClass, Void.class, "processGrammar", File.class, File.class);
+			final URL sableccLocation = sableccClass.getProtectionDomain().getCodeSource().getLocation();
 			LOGGER.info("Processing with SableCC");
 			SableCCResult result = new SableCCResult();
 			for (File grammarFile : grammarFiles) {
@@ -144,43 +146,20 @@ public abstract class SableCCTask extends SourceTask {
 					@Override
 					public void write(int b) {
 					}
-				})) {
+				}); URLClassLoader isolated = new URLClassLoader(new URL[] { sableccLocation }, ClassLoader.getPlatformClassLoader())) {
 					System.setOut(dummyStream);
 					try {
-						method.invokeStatic(grammarFile, getOutputDirectory());
-					} catch (UncheckedException e) {
-						Throwable cause = e.getCause();
-						if (cause instanceof ParserException) {
-							ParserException ex = (ParserException) cause;
-							result.addException(getException("Parse", ex.getMessage(), " found " + ex.getToken().toString()));
-						}
-						else if (cause instanceof LexerException) {
-							LexerException ex = (LexerException) cause;
-							result.addException(getException("Lexing", ex.getMessage(), ""));
-						}
-						else {
-							result.addException(cause);
-						}
-					} catch (RuntimeException e) {
-						String message = e.getMessage();
-						if (message.contains("shift/reduce conflict")) {
-							result.addException(new Exception("Your grammar has conflicts: " + message));
-						}
-						else {
-							Pattern p = Pattern.compile("\\[([0-9]*),([0-9]*)\\] P(\\w*) and T(\\w*) undefined.");
-							Matcher matcher = p.matcher(message);
-							try {
-								matcher.find();
-								result.addException(new Exception("Error in the grammar at line " + matcher.group(1) + " character "
-										+ matcher.group(2) + ", the symbol "
-										+ CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, matcher.group(3)) + " is undefined"));
-							} catch (Exception ee) {
-								throw e;
-							}
-						}
+						Class<?> isolatedMain = Class.forName(SABLECC_MAIN_CLASS, true, isolated);
+						isolatedMain.getMethod("processGrammar", File.class, File.class).invoke(null, grammarFile, getOutputDirectory());
+					} catch (InvocationTargetException e) {
+						handleFailure(result, e.getCause() != null ? e.getCause() : e);
+					} catch (ReflectiveOperationException e) {
+						throw new IllegalStateException("Cannot run SableCC", e);
 					} finally {
 						System.setOut(originalStream);
 					}
+				} catch (IOException e) {
+					throw new UncheckedIOException(e);
 				}
 			}
 			int errorCount = result.getErrorCount();
@@ -199,6 +178,48 @@ public abstract class SableCCTask extends SourceTask {
 			}
 		} catch (ClassNotFoundException cnf) {
 			throw new IllegalStateException("No SableCC implementation available");
+		}
+	}
+
+	/**
+	 * Records a failure of SableCC. The exception classes come from the class loader of that run, they are recognized by their name.
+	 */
+	private static void handleFailure(SableCCResult result, Throwable cause) {
+		if (cause instanceof UncheckedException && cause.getCause() != null) {
+			cause = cause.getCause();
+		}
+		String className = cause.getClass().getName();
+		if (className.equals("org.sablecc.sablecc.parser.ParserException")) {
+			String token = "";
+			try {
+				token = String.valueOf(cause.getClass().getMethod("getToken").invoke(cause));
+			} catch (ReflectiveOperationException e) {
+				// the position of the token is only informative
+			}
+			result.addException(getException("Parse", cause.getMessage(), " found " + token));
+		}
+		else if (className.equals("org.sablecc.sablecc.lexer.LexerException")) {
+			result.addException(getException("Lexing", cause.getMessage(), ""));
+		}
+		else if (cause instanceof RuntimeException) {
+			String message = String.valueOf(cause.getMessage());
+			if (message.contains("shift/reduce conflict")) {
+				result.addException(new Exception("Your grammar has conflicts: " + message));
+			}
+			else {
+				Pattern p = Pattern.compile("\\[([0-9]*),([0-9]*)\\] P(\\w*) and T(\\w*) undefined.");
+				Matcher matcher = p.matcher(message);
+				if (matcher.find()) {
+					result.addException(new Exception("Error in the grammar at line " + matcher.group(1) + " character " + matcher.group(2)
+							+ ", the symbol " + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, matcher.group(3)) + " is undefined"));
+				}
+				else {
+					throw (RuntimeException) cause;
+				}
+			}
+		}
+		else {
+			result.addException(cause);
 		}
 	}
 

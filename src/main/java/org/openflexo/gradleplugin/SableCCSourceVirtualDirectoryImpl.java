@@ -22,7 +22,6 @@ import org.gradle.api.file.SourceDirectorySet;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.reflect.HasPublicType;
 import org.gradle.api.reflect.TypeOf;
-import org.gradle.util.ConfigureUtil;
 
 import groovy.lang.Closure;
 
@@ -44,7 +43,11 @@ public class SableCCSourceVirtualDirectoryImpl implements SableCCSourceVirtualDi
 
 	@Override
 	public SableCCSourceVirtualDirectory sablecc(Closure configureClosure) {
-		ConfigureUtil.configure(configureClosure, getSableCC());
+		// ConfigureUtil is internal and gone in Gradle 9: delegate the closure to the source directory set
+		Closure<?> closure = (Closure<?>) configureClosure.clone();
+		closure.setResolveStrategy(Closure.DELEGATE_FIRST);
+		closure.setDelegate(getSableCC());
+		closure.call(getSableCC());
 		return this;
 	}
 
