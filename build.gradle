@@ -60,5 +60,6 @@ artifactory {
 dependencies {
     implementation gradleApi()
     implementation 'com.peterlavalle:sablecc-maven.sablecc:3.7'
-    implementation group: 'com.google.guava', name: 'guava', version: '27.0-jre'
+
+    testImplementation 'junit:junit:4.13.2'
 }

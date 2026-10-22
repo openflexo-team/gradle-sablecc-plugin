@@ -51,8 +51,6 @@ import org.gradle.work.InputChanges;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.CaseFormat;
-
 /**
  * Generates parsers from SableCC grammars.
  */
@@ -211,7 +209,7 @@ public abstract class SableCCTask extends SourceTask {
 				Matcher matcher = p.matcher(message);
 				if (matcher.find()) {
 					result.addException(new Exception("Error in the grammar at line " + matcher.group(1) + " character " + matcher.group(2)
-							+ ", the symbol " + CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, matcher.group(3)) + " is undefined"));
+							+ ", the symbol " + toLowerUnderscore(matcher.group(3)) + " is undefined"));
 				}
 				else {
 					throw (RuntimeException) cause;
@@ -221,6 +219,27 @@ public abstract class SableCCTask extends SourceTask {
 		else {
 			result.addException(cause);
 		}
+	}
+
+	/**
+	 * "SymbolName" gives "symbol_name": an underscore before each capital letter but the first one, in lower case. The same as the
+	 * UPPER_CAMEL to LOWER_UNDERSCORE conversion of Guava, which was the only use of that library.
+	 */
+	static String toLowerUnderscore(String upperCamel) {
+		StringBuilder returned = new StringBuilder();
+		for (int i = 0; i < upperCamel.length(); i++) {
+			char c = upperCamel.charAt(i);
+			if (Character.isUpperCase(c)) {
+				if (i > 0) {
+					returned.append('_');
+				}
+				returned.append(Character.toLowerCase(c));
+			}
+			else {
+				returned.append(c);
+			}
+		}
+		return returned.toString();
 	}
 
 	private static Exception getException(String kind, String message, String posttext) {
