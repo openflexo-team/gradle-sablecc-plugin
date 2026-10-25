@@ -51,7 +51,7 @@ public class SableCCPlugin implements Plugin<Project> {
 	public void apply(final Project project) {
 		project.getPluginManager().apply(JavaPlugin.class);
 
-		final Configuration sableccConfiguration = project.getConfigurations().create("sablecc").setVisible(false)
+		final Configuration sableccConfiguration = project.getConfigurations().create("sablecc")
 				.setDescription("The SableCC libraries to be used for this project.");
 
 		sableccConfiguration.defaultDependencies(new Action<DependencySet>() {
